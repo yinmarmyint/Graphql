@@ -5,6 +5,18 @@ const mongoose = require("mongoose");
 
 const app = express();
 
+mongoose.connect(
+  "mongodb+srv://root:root@tutorial-56hsp.mongodb.net/test?retryWrites=true&w=majority",
+  {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  }
+);
+
+mongoose.connection.once("open", () => {
+  console.log("database is connected");
+});
+
 app.use(
   "/graphql",
   graphqlHTTP({
