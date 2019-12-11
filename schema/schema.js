@@ -1,6 +1,6 @@
 const graphql = require("graphql");
 const _ = require("lodash");
-
+const mongoose = require("mongoose");
 const Book = require("./../models/book");
 const Author = require("./../models/author");
 
@@ -23,7 +23,9 @@ const BookType = new GraphQLObjectType({
     author: {
       type: AuthorType,
       resolve(parent, args) {
-        return Book.findById(parent.authorId);
+        if (mongoose.Types.ObjectId.isValid(parent.authorId)) {
+          return Author.findById({ _id: parent.authorId });
+        }
       }
     }
   })
@@ -88,14 +90,22 @@ const RootQuery = new GraphQLObjectType({
       type: new GraphQLList(BookType),
       resolve(parent, args) {
         // return books;
-        return Book.find();
+        return Book.find().limit(10);
       }
     },
     authors: {
       type: new GraphQLList(AuthorType),
+      args: {
+        page: {
+          type: GraphQLInt
+        }
+      },
       resolve(parent, args) {
-        // return authors;
-        return Author.find();
+        var pageLimit = 10,
+          page = Math.max(0, args.page);
+        return Author.find()
+          .limit(pageLimit)
+          .skip(pageLimit * page);
       }
     }
   }
@@ -124,14 +134,65 @@ const Mutation = new GraphQLObjectType({
       type: BookType,
       args: {
         name: { type: GraphQLString },
-        genre: { type: GraphQLString }
+        genre: { type: GraphQLString },
+        authorId: { type: GraphQLID }
       },
       resolve(parent, args) {
         let book = new Book({
           name: args.name,
-          genre: args.genre
+          genre: args.genre,
+          authorId: args.authorId
         });
         return book.save();
+      }
+    },
+    removeBook: {
+      type: BookType,
+      args: {
+        id: {
+          type: new GraphQLNonNull(GraphQLString)
+        }
+      },
+      resolve(parent, args) {
+        const removeBook = Book.findByIdAndDelete(args.id).exec();
+        if (!removeBook) {
+          throw new Error("Error");
+        }
+        return removeBook;
+      }
+    },
+    removeAuthor: {
+      type: BookType,
+      args: {
+        id: {
+          type: new GraphQLNonNull(GraphQLString)
+        }
+      },
+      resolve(parent, args) {
+        const removeAuthor = Author.findByIdAndDelete(args.id).exec();
+        if (!removeAuthor) {
+          throw new Error("Error");
+        }
+        return removeAuthor;
+      }
+    },
+    updateAuthor: {
+      type: AuthorType,
+      args: {
+        id: {
+          name: "id",
+          type: new GraphQLNonNull(GraphQLString)
+        },
+        name: {
+          type: new GraphQLNonNull(GraphQLString)
+        }
+      },
+      resolve(parent, args) {
+        return Author.findByIdAndUpdate(
+          args.id,
+          { $set: { name: args.name } },
+          { new: true }
+        ).catch(err => new Error(err));
       }
     }
   }
